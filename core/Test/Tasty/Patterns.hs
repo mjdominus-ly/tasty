@@ -17,10 +17,12 @@ import Test.Tasty.Patterns.Types
 import Test.Tasty.Patterns.Parser
 import Test.Tasty.Patterns.Eval
 
-import Data.Monoid
 import Data.Char
 import Data.Typeable
 import Options.Applicative hiding (Success)
+#if !MIN_VERSION_base(4,11,0)
+import Data.Monoid
+#endif
 
 newtype TestPattern = TestPattern (Maybe Expr)
   deriving (Typeable, Show, Eq)
