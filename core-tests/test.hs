@@ -2,12 +2,14 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.Runners
 import Test.Tasty.Options
+import Test.Tasty.Patterns.Types
 import Data.Maybe
 #if !MIN_VERSION_base(4,8,0)
 import Data.Monoid (mempty)
 #endif
 import Resources
 import Timeouts
+import Dependencies
 import AWK
 
 main :: IO ()
@@ -20,6 +22,7 @@ mainGroup = do
   return $ testGroup "Tests"
     [ testResources
     , testTimeouts
+    , testDependencies
     , patternTests
     , awkTests_
     ]
@@ -39,6 +42,14 @@ patternTests = testGroup "Patterns"
       (o "America" @?= ["Tests.North America.Ottawa","Tests.North America.Washington DC"])
   , testCase "AWK expression"
       (o "$3 ~ /r/ || $2 != \"Europe\"" @?= ["Tests.Europe.Paris","Tests.Europe.Berlin","Tests.North America.Ottawa","Tests.North America.Washington DC"])
+  , testCase "Simple ERE is parsed as such" $ -- #220
+      parseTestPattern "/foo/" @?= Just (TestPattern (Just (ERE "foo")))
+  , testCase "Dashes are acceptable in raw patterns" $ -- #220
+      parseTestPattern "type-checking" @?= Just (TestPattern (Just (ERE "type-checking")))
+  , testCase ". is a field separator (works as a raw pattern)" $
+      (o "ca.Ot" @?= ["Tests.North America.Ottawa"])
+  , testCase ". is a field separator (works inside an AWK expression)" $
+      (o "/ca.Ot/" @?= ["Tests.North America.Ottawa"])
   ]
   where
   -- apply a pattern to tt and get the names of tests that match

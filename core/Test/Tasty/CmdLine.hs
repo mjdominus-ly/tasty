@@ -1,41 +1,30 @@
 -- | Parsing options supplied on the command line
-{-# LANGUAGE CPP, ScopedTypeVariables, DeriveDataTypeable #-}
 module Test.Tasty.CmdLine
   ( optionParser
   , suiteOptions
   , suiteOptionParser
+  , parseOptions
   , defaultMainWithIngredients
   ) where
 
 import Options.Applicative
-import Data.Monoid
+import Data.Monoid ((<>))
 import Data.Proxy
 import Data.Foldable (foldMap)
 import Prelude  -- Silence AMP and FTP import warnings
 import System.Exit
 import System.IO
 
--- We install handlers only on UNIX (obviously) and on GHC >= 7.6.
--- GHC 7.4 lacks mkWeakThreadId (see #181), and this is not important
--- enough to look for an alternative implementation, so we just disable it
--- there.
-#define INSTALL_HANDLERS defined UNIX && MIN_VERSION_base(4,6,0)
-
-#if INSTALL_HANDLERS
-import Control.Concurrent (mkWeakThreadId, myThreadId)
-import Control.Exception (Exception(..), throwTo)
-import Control.Monad (forM_)
-import Data.Typeable (Typeable)
-import System.Posix.Signals
-import System.Mem.Weak (deRefWeak)
+#if !MIN_VERSION_base(4,9,0)
+import Data.Monoid
 #endif
 
 import Test.Tasty.Core
+import Test.Tasty.Runners.Utils
 import Test.Tasty.Ingredients
 import Test.Tasty.Options
 import Test.Tasty.Options.Env
 import Test.Tasty.Runners.Reducers
-
 
 -- | Generate a command line parser from a list of option descriptions
 optionParser :: [OptionDescription] -> Parser OptionSet
@@ -48,6 +37,25 @@ optionParser = getApp . foldMap toSet where
 suiteOptionParser :: [Ingredient] -> TestTree -> Parser OptionSet
 suiteOptionParser ins tree = optionParser $ suiteOptions ins tree
 
+-- | Parse the command-line and environment options passed to tasty.
+--
+-- Useful if you need to get the options before 'defaultMain' is called.
+--
+-- Once within the test tree, 'askOption' should be used instead.
+--
+-- The arguments to this function should be the same as for
+-- 'defaultMainWithIngredients'. If you don't use any custom ingredients,
+-- pass 'defaultIngredients'.
+parseOptions :: [Ingredient] -> TestTree -> IO OptionSet
+parseOptions ins tree = do
+  cmdlineOpts <- execParser $
+    info (helper <*> suiteOptionParser ins tree)
+    ( fullDesc <>
+      header "Mmm... tasty test suite"
+    )
+  envOpts <- suiteEnvOptions ins tree
+  return $ envOpts <> cmdlineOpts
+
 -- | Parse the command line arguments and run the tests using the provided
 -- ingredient list.
 --
@@ -57,15 +65,7 @@ suiteOptionParser ins tree = optionParser $ suiteOptions ins tree
 defaultMainWithIngredients :: [Ingredient] -> TestTree -> IO ()
 defaultMainWithIngredients ins testTree = do
   installSignalHandlers
-  cmdlineOpts <- execParser $
-    info (helper <*> suiteOptionParser ins testTree)
-    ( fullDesc <>
-      header "Mmm... tasty test suite"
-    )
-
-  envOpts <- suiteEnvOptions ins testTree
-
-  let opts = envOpts <> cmdlineOpts
+  opts <- parseOptions ins testTree
 
   case tryIngredients ins opts testTree of
     Nothing -> do
@@ -75,28 +75,3 @@ defaultMainWithIngredients ins testTree = do
     Just act -> do
       ok <- act
       if ok then exitSuccess else exitFailure
-
--- from https://ro-che.info/articles/2014-07-30-bracket
--- Install a signal handler so that e.g. the cursor is restored if the test
--- suite is killed by SIGTERM.
-installSignalHandlers :: IO ()
-installSignalHandlers = do
-#if INSTALL_HANDLERS
-  main_thread_id <- myThreadId
-  weak_tid <- mkWeakThreadId main_thread_id
-  forM_ [ sigABRT, sigBUS, sigFPE, sigHUP, sigILL, sigQUIT, sigSEGV,
-          sigSYS, sigTERM, sigUSR1, sigUSR2, sigXCPU, sigXFSZ ] $ \sig ->
-    installHandler sig (Catch $ send_exception weak_tid sig) Nothing
-  where
-    send_exception weak_tid sig = do
-      m <- deRefWeak weak_tid
-      case m of
-        Nothing  -> return ()
-        Just tid -> throwTo tid (toException $ SignalException sig)
-
-newtype SignalException = SignalException Signal
-  deriving (Show, Typeable)
-instance Exception SignalException
-#else
-  return ()
-#endif

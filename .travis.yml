@@ -48,6 +48,12 @@ matrix:
   - env: BUILD=cabal GHCVER=8.0.2 CABALVER=1.24 HAPPYVER=1.19.5 ALEXVER=3.1.7
     compiler: ": #GHC 8.0.2"
     addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=8.2.2 CABALVER=1.24 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #GHC 8.2.2"
+    addons: {apt: {packages: [cabal-install-1.24,ghc-8.2.2], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=8.4.2 CABALVER=1.24 HAPPYVER=1.19.5 ALEXVER=3.1.7
+    compiler: ": #GHC 8.4.2"
+    addons: {apt: {packages: [cabal-install-1.24,ghc-8.4.2], sources: [hvr-ghc]}}
 
   ## Build with the newest GHC and cabal-install. This is an accepted failure,
   ## see below.
@@ -55,18 +61,8 @@ matrix:
     compiler: ": #GHC HEAD"
     addons: {apt: {packages: [cabal-install-head,ghc-head], sources: [hvr-ghc]}}
 
-  # The Stack builds. We can pass in arbitrary Stack arguments via the ARGS
-  # variable, such as using --stack-yaml to point to a different file.
-  - env: BUILD=stack ARGS="--resolver lts-6"
-    compiler: ": #stack 7.10.3"
-    addons: {apt: {packages: [libgmp-dev]}}
-
-  - env: BUILD=stack ARGS="--resolver lts-8" WARNINGS=true
-    compiler: ": #stack 8.0.2"
-    addons: {apt: {packages: [libgmp-dev]}}
-
-  - env: BUILD=stack ARGS="--resolver lts-10" WARNINGS=true
-    compiler: ": #stack 8.2.2"
+  - env: BUILD=stack ARGS="--resolver nightly-2019-01-30" WARNINGS=true
+    compiler: ": #stack 8.6.3"
     addons: {apt: {packages: [libgmp-dev]}}
 
   allow_failures:
@@ -118,7 +114,8 @@ install:
       # Get the list of packages from the stack.yaml file
       PACKAGES=$(stack --install-ghc query locals | grep '^ *path' | sed 's@^ *path:@@' | grep -v 'core-tests')
 
-      cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1 $CABALARGS $PACKAGES
+      # don't use -O0 here; see https://github.com/haskell/primitive/issues/177
+      cabal install primitive
       ;;
   esac
   set +ex
@@ -135,8 +132,9 @@ script:
       else
         stack --no-terminal $ARGS test --bench --no-run-benchmarks --haddock --no-haddock-deps
       fi
-      (cd core-tests && stack --no-terminal $ARGS exec tasty-core-tests)
+      (cd core-tests && stack --no-terminal $ARGS exec tasty-core-tests -- +RTS -N2)
       stack --no-terminal $ARGS exec core-tests/exit-status-tests.sh
+      stack --no-terminal $ARGS exec core-tests/resource-release-test.sh
       ;;
     cabal)
       cabal install --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1 $CABALARGS $PACKAGES

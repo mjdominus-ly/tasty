@@ -5,6 +5,7 @@ module Test.Tasty.Ingredients.ConsoleReporter
   ( consoleTestReporter
   , Quiet(..)
   , HideSuccesses(..)
+  , AnsiTricks(..)
   -- * Internals
   -- | The following functions and datatypes are internals that are exposed to
   -- simplify the task of rolling your own custom console reporter UI.
@@ -14,6 +15,7 @@ module Test.Tasty.Ingredients.ConsoleReporter
   , useColor
   -- ** Test failure statistics
   , Statistics(..)
+  , computeStatistics
   , printStatistics
   , printStatisticsNoTime
   -- ** Outputting results
@@ -37,10 +39,13 @@ import Test.Tasty.Runners.Utils
 import Text.Printf
 import qualified Data.IntMap as IntMap
 import Data.Char
+#ifdef UNIX
+import Data.Char.WCWidth (wcwidth)
+#endif
 import Data.Maybe
-import Data.Monoid
+import Data.Monoid (Any(..))
 import Data.Typeable
-import Options.Applicative hiding (str)
+import Options.Applicative hiding (str, Success, Failure)
 import System.IO
 import System.Console.ANSI
 #if !MIN_VERSION_base(4,8,0)
@@ -50,6 +55,8 @@ import Data.Foldable hiding (concatMap,elem,sequence_)
 #if MIN_VERSION_base(4,9,0)
 import Data.Semigroup (Semigroup)
 import qualified Data.Semigroup (Semigroup((<>)))
+#else
+import Data.Monoid
 #endif
 
 --------------------------------------------------
@@ -105,7 +112,7 @@ buildTestOutput opts tree =
       let
         printTestName = do
           printf "%s%s: %s" (indent level) name
-            (replicate (alignment - indentSize * level - length name) ' ')
+            (replicate (alignment - indentSize * level - stringWidth name) ' ')
           hFlush stdout
 
         printTestResult result = do
@@ -114,9 +121,10 @@ buildTestOutput opts tree =
           -- use an appropriate printing function
           let
             printFn =
-              if resultSuccessful result
-                then ok
-                else fail
+              case resultOutcome result of
+                Success -> ok
+                Failure TestDepFailed -> skipped
+                _ -> fail
             time = resultTime result
           printFn (resultShortDescription result)
           -- print time only if it's significant
@@ -280,6 +288,9 @@ instance Semigroup Statistics where
   (<>) = mappend
 #endif
 
+-- | @computeStatistics@ computes a summary 'Statistics' for
+-- a given state of the 'StatusMap'.
+-- Useful in combination with @printStatistics@
 computeStatistics :: StatusMap -> IO Statistics
 computeStatistics = getApp . foldMap (\var -> Ap $
   (\r -> Statistics 1 (if resultSuccessful r then 0 else 1))
@@ -375,6 +386,7 @@ consoleTestReporter =
     [ Option (Proxy :: Proxy Quiet)
     , Option (Proxy :: Proxy HideSuccesses)
     , Option (Proxy :: Proxy UseColor)
+    , Option (Proxy :: Proxy AnsiTricks)
     ] $
   \opts tree -> Just $ \smap -> do
 
@@ -383,6 +395,7 @@ consoleTestReporter =
     Quiet quiet = lookupOption opts
     HideSuccesses hideSuccesses = lookupOption opts
     NumThreads numThreads = lookupOption opts
+    AnsiTricks ansiTricks = lookupOption opts
 
   if quiet
     then do
@@ -392,6 +405,7 @@ consoleTestReporter =
 
       do
       isTerm <- hSupportsANSI stdout
+      isTermColor <- hSupportsANSIColor stdout
 
       (\k -> if isTerm
         then (do hideCursor; k) `finally` showCursor
@@ -400,15 +414,15 @@ consoleTestReporter =
           hSetBuffering stdout LineBuffering
 
           let
-            ?colors = useColor whenColor isTerm
+            ?colors = useColor whenColor isTermColor
 
           let
             toutput = buildTestOutput opts tree
 
           case () of { _
-            | hideSuccesses && isTerm ->
+            | hideSuccesses && isTerm && ansiTricks ->
                 consoleOutputHidingSuccesses toutput smap
-            | hideSuccesses && not isTerm ->
+            | hideSuccesses ->
                 streamOutputHidingSuccesses toutput smap
             | otherwise -> consoleOutput toutput smap
           }
@@ -454,6 +468,32 @@ instance IsOption UseColor where
   optionName = return "color"
   optionHelp = return "When to use colored output (default: 'auto')"
   optionCLParser = mkOptionCLParser $ metavar "never|always|auto"
+
+-- | By default, when the option @--hide-successes@ is given and the output
+-- goes to an ANSI-capable terminal, we employ some ANSI terminal tricks to
+-- display the name of the currently running test and then erase it if it
+-- succeeds.
+--
+-- These tricks sometimes fail, however—in particular, when the test names
+-- happen to be longer than the width of the terminal window. See
+--
+-- * <https://github.com/feuerbach/tasty/issues/152>
+--
+-- * <https://github.com/feuerbach/tasty/issues/250>
+--
+-- When that happens, this option can be used to disable the tricks. In
+-- that case, the test name will be printed only once the test fails.
+newtype AnsiTricks = AnsiTricks Bool
+  deriving Typeable
+
+instance IsOption AnsiTricks where
+  defaultValue = AnsiTricks True
+  parseValue = fmap AnsiTricks . safeReadBool
+  optionName = return "ansi-tricks"
+  optionHelp = return $
+    -- Multiline literals don't work because of -XCPP.
+    "Enable various ANSI terminal tricks. " ++
+    "Can be set to 'true' (default) or 'false'."
 
 -- | @useColor when isTerm@ decides if colors should be used,
 --   where @isTerm@ indicates whether @stdout@ is a terminal device.
@@ -539,13 +579,13 @@ instance Ord a => Semigroup (Maximum a) where
   (<>) = mappend
 #endif
 
--- | Compute the amount of space needed to align "OK"s and "FAIL"s
+-- | Compute the amount of space needed to align \"OK\"s and \"FAIL\"s
 computeAlignment :: OptionSet -> TestTree -> Int
 computeAlignment opts =
   fromMonoid .
   foldTestTree
     trivialFold
-      { foldSingle = \_ name _ level -> Maximum (length name + level)
+      { foldSingle = \_ name _ level -> Maximum (stringWidth name + level)
       , foldGroup = \_ m -> m . (+ indentSize)
       }
     opts
@@ -555,10 +595,28 @@ computeAlignment opts =
         MinusInfinity -> 0
         Maximum x -> x
 
+-- | Compute the length/width of the string as it would appear in a monospace
+--   terminal. This takes into account that even in a “mono”space font, not
+--   all characters actually have the same width, in particular, most CJK
+--   characters have twice the same as Western characters.
+--
+--   (This only works properly on Unix at the moment; on Windows, the function
+--   treats every character as width-1 like 'Data.List.length' does.)
+stringWidth :: String -> Int
+#ifdef UNIX
+stringWidth = Prelude.sum . map charWidth
+ where charWidth c = case wcwidth c of
+        -1 -> 1  -- many chars have "undefined" width; default to 1 for these.
+        w  -> w
+#else
+stringWidth = length
+#endif
+
 -- (Potentially) colorful output
-ok, fail, infoOk, infoFail :: (?colors :: Bool) => String -> IO ()
+ok, fail, skipped, infoOk, infoFail :: (?colors :: Bool) => String -> IO ()
 fail     = output BoldIntensity   Vivid Red
 ok       = output NormalIntensity Dull  Green
+skipped  = output NormalIntensity Dull  Magenta
 infoOk   = output NormalIntensity Dull  White
 infoFail = output NormalIntensity Dull  Red
 

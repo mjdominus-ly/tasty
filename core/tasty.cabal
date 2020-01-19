@@ -2,7 +2,7 @@
 --  see http://haskell.org/cabal/users-guide/
 
 name:                tasty
-version:             1.0.1.1
+version:             1.2.3
 synopsis:            Modern and extensible testing framework
 description:         Tasty is a modern testing framework for Haskell.
                      It lets you combine your unit tests, golden
@@ -66,7 +66,7 @@ library
     optparse-applicative >= 0.14,
     unbounded-delays >= 0.1,
     async >= 2.0,
-    ansi-terminal >= 0.6.2
+    ansi-terminal >= 0.9
 
   if flag(clock)
     build-depends: clock >= 0.4.4.0
@@ -77,11 +77,12 @@ library
     -- for GHC.Generics
     build-depends: ghc-prim
 
-  if !os(windows)
-    build-depends: unix
-    cpp-options: -DUNIX
+  if !os(windows) && !impl(ghcjs)
+    build-depends: unix,
+                   wcwidth
+    cpp-options: -D__UNIX__
 
   -- hs-source-dirs:      
   default-language:    Haskell2010
-  default-extensions:  CPP
+  default-extensions:  CPP, ScopedTypeVariables, DeriveDataTypeable
   ghc-options: -Wall

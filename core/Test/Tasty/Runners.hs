@@ -26,6 +26,7 @@ module Test.Tasty.Runners
   , ListTests(..)
   , testsNames
     -- * Command line handling
+  , parseOptions
   , optionParser
   , suiteOptionParser
   , defaultMainWithIngredients
@@ -39,6 +40,7 @@ module Test.Tasty.Runners
   , StatusMap
   , launchTestTree
   , NumThreads(..)
+  , DependencyException(..)
     -- * Options
   , suiteOptions
   , coreOptions

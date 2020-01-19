@@ -85,7 +85,7 @@ determined by chance.)
 [tasty][] is the core package. It contains basic definitions and APIs and a
 console runner.
 
-[tasty]: http://hackage.haskell.org/package/tasty
+[tasty]: https://hackage.haskell.org/package/tasty
 
 In order to create a test suite, you also need to install one or more «providers» (see
 below).
@@ -94,23 +94,27 @@ below).
 
 The following providers exist:
 
-* [tasty-hunit](http://hackage.haskell.org/package/tasty-hunit) — for unit tests
-  (based on [HUnit](http://hackage.haskell.org/package/HUnit))
+* [tasty-hunit](https://hackage.haskell.org/package/tasty-hunit) — for unit tests
+  (based on [HUnit](https://hackage.haskell.org/package/HUnit))
 * [tasty-golden][] — for golden
   tests, which are unit tests whose results are kept in files
-* [tasty-smallcheck](http://hackage.haskell.org/package/tasty-smallcheck) —
+* [tasty-smallcheck](https://hackage.haskell.org/package/tasty-smallcheck) —
   exhaustive property-based testing
-  (based on [smallcheck](http://hackage.haskell.org/package/smallcheck))
-* [tasty-quickcheck](http://hackage.haskell.org/package/tasty-quickcheck) — for randomized
+  (based on [smallcheck](https://hackage.haskell.org/package/smallcheck))
+* [tasty-quickcheck](https://hackage.haskell.org/package/tasty-quickcheck) — for randomized
   property-based testing (based on [QuickCheck](http://hackage.haskell.org/package/QuickCheck))
 * [tasty-hedgehog](https://github.com/qfpl/tasty-hedgehog) — for randomized
-  property-based testing (based on [Hedgehog](http://hackage.haskell.org/package/hedgehog))
-* [tasty-hspec](http://hackage.haskell.org/package/tasty-hspec) — for
-  [Hspec](http://hspec.github.io/) tests
-* [tasty-program](http://hackage.haskell.org/package/tasty-program) — run
+  property-based testing (based on [Hedgehog](https://hackage.haskell.org/package/hedgehog))
+* [tasty-hspec](https://hackage.haskell.org/package/tasty-hspec) — for
+  [Hspec](https://hspec.github.io/) tests
+* [tasty-leancheck](https://hackage.haskell.org/package/tasty-leancheck) — for
+  enumerative property-based testing
+  (based on [LeanCheck](https://hackage.haskell.org/package/leancheck))
+* [tasty-program](https://hackage.haskell.org/package/tasty-program) — run
   external program and test whether it terminates successfully
+* [tasty-wai](https://hackage.haskell.org/package/tasty-wai) - for testing [wai](https://hackage.haskell.org/wai) endpoints.
 
-[tasty-golden]: http://hackage.haskell.org/package/tasty-golden
+[tasty-golden]: https://hackage.haskell.org/package/tasty-golden
 
 It's easy to create custom providers using the API from `Test.Tasty.Providers`.
 
@@ -126,24 +130,24 @@ It is possible to write custom ingredients using the API from `Test.Tasty.Runner
 
 Some ingredients that can enhance your test suite are:
 
-* [tasty-ant-xml](http://hackage.haskell.org/package/tasty-ant-xml) adds a
+* [tasty-ant-xml](https://hackage.haskell.org/package/tasty-ant-xml) adds a
   possibility to write the test results in a machine-readable XML format, which
   is understood by various CI systems and IDEs
-* [tasty-rerun](http://hackage.haskell.org/package/tasty-rerun) adds support for
+* [tasty-rerun](https://hackage.haskell.org/package/tasty-rerun) adds support for
   minimal test reruns by recording previous test runs and using this information
   to filter the test tree. For example, you can use this ingredient to only run
   failed tests, or only run tests that threw an exception.
-* [tasty-html](http://hackage.haskell.org/package/tasty-html) adds the
+* [tasty-html](https://hackage.haskell.org/package/tasty-html) adds the
   possibility to write the test results as a HTML file
-* [tasty-stats](http://hackage.haskell.org/package/tasty-stats) adds the
+* [tasty-stats](https://hackage.haskell.org/package/tasty-stats) adds the
   possibility to collect statistics of the test suite in a CSV file.
 
 ### Other packages
 
-* [tasty-th](http://hackage.haskell.org/package/tasty-th) automatically
+* [tasty-th](https://hackage.haskell.org/package/tasty-th) automatically
 discovers tests based on the function names and generate the boilerplate code for
 you
-* [tasty-hunit-adapter](http://hackage.haskell.org/package/tasty-hunit-adapter)
+* [tasty-hunit-adapter](https://hackage.haskell.org/package/tasty-hunit-adapter)
   converts existing HUnit test suites into tasty test suites
 * [tasty-discover](https://github.com/lwm/tasty-discover) automatically discovers
 your tests.
@@ -264,9 +268,9 @@ on.
 A pattern is an [awk expression][awk]. When the expression is evaluated, the field `$1`
 is set to the outermost test group name, `$2` is set to the next test group
 name, and so on up to `$NF`, which is set to the test's own name. The field `$0`
-is set to all other fields concatenated using `/` as a separator.
+is set to all other fields concatenated using `.` as a separator.
 
-[awk]: http://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html#tag_20_06_13_02
+[awk]: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/awk.html#tag_20_06_13_02
 
 As an example, consider a test inside two test groups:
 
@@ -276,7 +280,7 @@ As an example, consider a test inside two test groups:
 
 When a pattern is evaluated for the above test case, the available fields and variables are:
 
-    $0 = "One/Two/Three"
+    $0 = "One.Two.Three"
     $1 = "One"
     $2 = "Two"
     $3 = "Three"
@@ -293,9 +297,9 @@ Here are some examples of awk expressions accepted as patterns:
     contains `QuickCheck`
 
 As an extension to the awk expression language, if a pattern `pat` contains only
-letters, digits, and characters from the set `[_/ ]`, it is treated like `/pat/`
-(and therefore matched against `$0`). This is so that we can use `-p foo` as
-a shortcut for `-p /foo/`.
+letters, digits, and characters from the set `._ -` (period, underscore, space, hyphen),
+it is treated like `/pat/` (and therefore matched against `$0`).
+This is so that we can use `-p foo` as a shortcut for `-p /foo/`.
 
 The only deviation from awk that you will likely notice is that Tasty
 does not implement regular expression matching.
@@ -663,18 +667,99 @@ library. You have two options:
   will lead to double compilation (once for the program and once for the test
   suite).
 
+## Dependencies
+
+Tasty executes tests in parallel to make them finish faster.
+If this parallelism is not desirable, you can declare *dependencies* between
+tests, so that one test will not start until certain other tests finish.
+
+Dependencies are declared using the `after` combinator:
+
+* `after AllFinish "pattern" my_tests` will execute the test tree `my_tests` only after all
+    tests that match the pattern finish.
+* `after AllSucceed "pattern" my_tests` will execute the test tree `my_tests` only after all
+    tests that match the pattern finish **and** only if they all succeed. If at
+    least one dependency fails, then `my_tests` will be skipped.
+
+The relevant types are:
+
+``` haskell
+after
+  :: DependencyType -- ^ whether to run the tests even if some of the dependencies fail
+  -> String         -- ^ the pattern
+  -> TestTree       -- ^ the subtree that depends on other tests
+  -> TestTree       -- ^ the subtree annotated with dependency information
+
+data DependencyType = AllSucceed | AllFinish
+```
+
+The pattern follows the same AWK-like syntax and semantics as described in
+[Patterns](#patterns). There is also a variant named `after_` that accepts the
+AST of the pattern instead of a textual representation.
+
+Let's consider some typical examples. (A note about terminology: here
+by "resource" I mean anything stateful and external to the test: it could be a file,
+a database record, or even a value stored in an `IORef` that's shared among
+tests. The resource may or may not be managed by `withResource`.)
+
+1. Two tests, Test A and Test B, access the same shared resource and cannot be
+   run concurrently. To achieve this, make Test A a dependency of Test B:
+
+   ``` haskell
+   testGroup "Tests accessing the same resource"
+     [ testCase "Test A" $ ...
+     , after AllFinish "Test A" $
+         testCase "Test B" $ ...
+     ]
+   ```
+
+1. Test A creates a resource and Test B uses that resource. Like above, we make
+   Test A a dependency of Test B, except now we don't want to run Test B if Test
+   A failed because the resource may not have been set up properly. So we use
+   `AllSucceed` instead of `AllFinish`
+
+   ``` haskell
+   testGroup "Tests creating and using a resource"
+     [ testCase "Test A" $ ...
+     , after AllSucceed "Test A" $
+         testCase "Test B" $ ...
+     ]
+   ```
+
+Here are some caveats to keep in mind regarding dependencies in Tasty:
+
+1. If Test B depends on Test A, remember that either of the may be filtered out
+   using the `--pattern` option. Collecting the dependency info happens *after*
+   filtering. Therefore, if Test A is filtered out, Test B will run
+   unconditionally, and if Test B is filtered out, it simply won't run.
+1. Tasty does not currently check whether the pattern in a dependency matches
+   anything at all, so make sure your patterns are correct and do not contain
+   typos. Fortunately, misspecified dependencies usually lead to test failures
+   and so can be detected that way.
+1. Dependencies shouldn't form a cycle, otherwise Tasty with fail with the
+   message "Test dependencies form a loop." A common cause of this is a test
+   matching its own dependency pattern.
+1. Using dependencies may introduce quadratic complexity. Specifically,
+   resolving dependencies is *O(number_of_tests × number_of_dependencies)*,
+   since each pattern has to be matched against each test name. As a guideline,
+   if you have up to 1000 tests, the overhead will be negligible, but if you
+   have thousands of tests or more, then you probably shouldn't have more than a
+   few dependencies.
+
+   Additionally, it is recommended that the dependencies follow the
+   natural order of tests, i.e. that the later tests in the test tree depend on
+   the earlier ones and not vice versa. If the execution order mandated by the
+   dependencies is sufficiently different from the natural order of tests in the
+   test tree, searching for the next test to execute may also have an
+   overhead quadratic in the number of tests.
+
+
 ## FAQ
 
-1.  How do I make some tests execute after others?
-
-    Currently, your only option is to make all tests execute sequentially by
-    setting the number of tasty threads to 1 ([example](#num_threads_example)).
-    See [#48](https://github.com/feuerbach/tasty/issues/48) for the discussion.
-
-2.  When my tests write to stdout/stderr, the output is garbled. Why is that and
+1.  **Q**: When my tests write to stdout/stderr, the output is garbled. Why is that and
     what do I do?
 
-    It is not recommended that you print anything to the console when using the
+    **A**: It is not recommended that you print anything to the console when using the
     console test reporter (which is the default one).
     See [#103](https://github.com/feuerbach/tasty/issues/103) for the
     discussion.
@@ -685,25 +770,36 @@ library. You have two options:
     * Use a test reporter that does not print to the console (like tasty-ant-xml).
     * Write your output to files instead.
 
+2.  **Q**: Why doesn't the `--hide-successes` option work properly? The test headings
+    show up and/or the output appears garbled.
+
+    **A**: This can happen sometimes when the terminal is narrower than the
+    output. A workaround is to disable ANSI tricks: pass `--ansi-tricks=false`
+    on the command line or set `TASTY_ANSI_TRICKS=false` in the environment.
+
+    See [issue #152](https://github.com/feuerbach/tasty/issues/152).
+
 ## Press
 
 Blog posts and other publications related to tasty. If you wrote or just found
 something not mentioned here, send a pull request!
 
-* [Holy Haskell Project Starter](http://yannesposito.com/Scratch/en/blog/Holy-Haskell-Starter/)
-* [First time testing, also with FP Complete](http://levischuck.com/posts/2013-11-13-first-testing-and-fpcomplete.html)
+* [Holy Haskell Project Starter](https://yannesposito.com/Scratch/en/blog/Holy-Haskell-Starter/)
+* [First time testing, also with FP Complete](https://levischuck.com/posts/2013-11-13-first-testing-and-fpcomplete.html)
   (tasty has been added to stackage since then)
-* [24 Days of Hackage: tasty](http://ocharles.org.uk/blog/posts/2013-12-03-24-days-of-hackage-tasty.html)
+* [24 Days of Hackage: tasty](https://ocharles.org.uk/blog/posts/2013-12-03-24-days-of-hackage-tasty.html)
 * [Resources in Tasty](https://ro-che.info/articles/2013-12-10-tasty-resources)
 * [Custom options in Tasty][custom-options-article]
 * [Resources in Tasty (update)](https://ro-che.info/articles/2013-12-29-tasty-resources-2)
-* [Announcing tasty-rerun](http://ocharles.org.uk/blog/posts/2014-01-20-announcing-tasty-rerun.html)
-* [Code testing in Haskell revisited (with Tasty)](http://lambda.jstolarek.com/2014/01/code-testing-in-haskell-revisited-with-tasty/)
+* [Announcing tasty-rerun](https://ocharles.org.uk/blog/posts/2014-01-20-announcing-tasty-rerun.html)
+* [Code testing in Haskell revisited (with Tasty)](https://lambda.jstolarek.com/2014/01/code-testing-in-haskell-revisited-with-tasty/)
 * [New patterns in tasty][awk-patterns-article]
 * [Screencast: Dynamic Test Suites in Haskell using Hspec and Tasty](https://www.youtube.com/watch?v=PGsDvgmZF7A)
+* [Automatically generated directories for tasty tests][tasty-directories]
 
 [custom-options-article]: https://ro-che.info/articles/2013-12-20-tasty-custom-options.html
 [awk-patterns-article]: https://ro-che.info/articles/2018-01-08-tasty-new-patterns
+[tasty-directories]: https://nmattia.com/posts/2018-04-30-tasty-test-names.html
 
 Maintainers
 -----------
