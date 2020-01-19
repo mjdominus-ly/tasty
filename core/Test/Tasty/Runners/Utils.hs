@@ -22,7 +22,8 @@ import Test.Tasty.Core (Time)
 -- GHC 7.4 lacks mkWeakThreadId (see #181), and this is not important
 -- enough to look for an alternative implementation, so we just disable it
 -- there.
-#define INSTALL_HANDLERS defined __UNIX__ && MIN_VERSION_base(4,6,0)
+-- #define INSTALL_HANDLERS defined __UNIX__ && MIN_VERSION_base(4,6,0)
+#define INSTALL_HANDLERS false
 
 #if INSTALL_HANDLERS
 import Control.Concurrent (mkWeakThreadId, myThreadId)
