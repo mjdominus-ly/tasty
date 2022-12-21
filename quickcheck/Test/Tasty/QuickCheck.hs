@@ -22,6 +22,7 @@ module Test.Tasty.QuickCheck
 
 import Test.Tasty ( testGroup )
 import Test.Tasty.Providers
+import Test.Tasty.Runners ( resultDescription, mkTimeoutResult )
 import Test.Tasty.Options
 import qualified Test.QuickCheck as QC
 import Test.Tasty.Runners (formatMessage)
@@ -53,6 +54,7 @@ import Text.Printf
 import Test.QuickCheck.Random (mkQCGen)
 import Options.Applicative (metavar)
 import System.Random (getStdRandom, randomR)
+import Control.Exception (handle)
 #if !MIN_VERSION_base(4,9,0)
 import Control.Applicative
 import Data.Monoid
@@ -212,19 +214,26 @@ instance IsTest QC where
       replayMsg = makeReplayMsg replaySeed maxSize
 
     -- Quickcheck already catches exceptions, no need to do it here.
-    r <- testRunner args prop
+    handle (pure . mkTimeoutResultWithSeed replaySeed) $ do
+      r <- testRunner args prop
 
-    qcOutput <- formatMessage $ QC.output r
-    let qcOutputNl =
-          if "\n" `isSuffixOf` qcOutput
-            then qcOutput
-            else qcOutput ++ "\n"
-        testSuccessful = successful r
-        putReplayInDesc = (not testSuccessful) || showReplay
-    return $
-      (if testSuccessful then testPassed else testFailed)
-      (qcOutputNl ++
-        (if putReplayInDesc then replayMsg else ""))
+      qcOutput <- formatMessage $ QC.output r
+      let qcOutputNl =
+            if "\n" `isSuffixOf` qcOutput
+              then qcOutput
+              else qcOutput ++ "\n"
+          testSuccessful = successful r
+          putReplayInDesc = (not testSuccessful) || showReplay
+      return $
+        (if testSuccessful then testPassed else testFailed)
+        (qcOutputNl ++
+          (if putReplayInDesc then replayMsg else ""))
+    where
+      -- N.B. technically violates the rule to always rethrow async exceptions,
+      -- but i think this exception to the rule makes sense
+      mkTimeoutResultWithSeed seed e =
+        let result = mkTimeoutResult e
+         in  result{resultDescription = resultDescription result ++ printf " -- with seed: %d" seed}
 
 successful :: QC.Result -> Bool
 successful r =

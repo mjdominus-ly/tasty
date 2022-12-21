@@ -48,6 +48,8 @@ module Test.Tasty.Runners
   , module Test.Tasty.Patterns
     -- * Utilities
   , module Test.Tasty.Runners.Utils
+    -- * also this
+  , mkTimeoutResult
   )
   where
 

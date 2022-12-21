@@ -6,6 +6,7 @@ module Test.Tasty.Run
   ( Status(..)
   , StatusMap
   , launchTestTree
+  , mkTimeoutResult
   , DependencyException(..)
   ) where
 
@@ -91,6 +92,17 @@ data Finalizer
       (TVar (Resource res))
       (TVar Int)
 
+mkTimeoutResult :: TastyTimeout -> Result
+mkTimeoutResult (TastyTimeout t tstr) =
+  Result
+  { resultOutcome = Failure $ TestTimedOut t
+  , resultDescription =
+      "Timed out after " ++ tstr
+  , resultShortDescription = "TIMEOUT"
+  , resultTime = fromIntegral t
+  , resultDetailsPrinter = noResultDetails
+  }
+
 -- | Execute a test taking care of resources
 executeTest
   :: ((Progress -> IO ()) -> IO Result)
@@ -170,15 +182,7 @@ executeTest action statusVar timeoutOpt inits fins = mask $ \restore -> do
     applyTimeout NoTimeout a = a
     applyTimeout (Timeout t tstr) a = do
       let
-        timeoutResult =
-          Result
-            { resultOutcome = Failure $ TestTimedOut t
-            , resultDescription =
-                "Timed out after " ++ tstr
-            , resultShortDescription = "TIMEOUT"
-            , resultTime = fromIntegral t
-            , resultDetailsPrinter = noResultDetails
-            }
+        timeoutResult = mkTimeoutResult (TastyTimeout t tstr)
       -- If compiled with unbounded-delays then t' :: Integer, otherwise t' :: Int
       let t' = fromInteger (min (max 0 t) (toInteger (maxBound :: Int64)))
       fromMaybe timeoutResult <$> timeout t' a
@@ -246,6 +250,11 @@ instance Show DependencyException where
       showCycle (x:xs) = "- " ++ intercalate ", " (map showPath (x:xs ++ [x]))
 
 instance Exception DependencyException
+
+data TastyTimeout = TastyTimeout Integer String
+  deriving Show
+
+instance Exception TastyTimeout
 
 -- | Turn a test tree into a list of actions to run tests coupled with
 -- variables to watch them.
