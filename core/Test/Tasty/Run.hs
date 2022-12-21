@@ -7,6 +7,7 @@ module Test.Tasty.Run
   , StatusMap
   , launchTestTree
   , mkTimeoutResult
+  , TastyTimeout
   , DependencyException(..)
   ) where
 
@@ -97,7 +98,7 @@ mkTimeoutResult (TastyTimeout t tstr) =
   Result
   { resultOutcome = Failure $ TestTimedOut t
   , resultDescription =
-      "Timed out after " ++ tstr
+      "Tasty timed out after " ++ tstr
   , resultShortDescription = "TIMEOUT"
   , resultTime = fromIntegral t
   , resultDetailsPrinter = noResultDetails
@@ -178,14 +179,20 @@ executeTest action statusVar timeoutOpt inits fins = mask $ \restore -> do
             Destroyed      -> return $ sleepIndefinitely
             BeingDestroyed -> return $ sleepIndefinitely
 
+    -- This is Timeout from Test.Tasty.Options.Core, not System.Timeout
     applyTimeout :: Timeout -> IO Result -> IO Result
     applyTimeout NoTimeout a = a
     applyTimeout (Timeout t tstr) a = do
-      let
-        timeoutResult = mkTimeoutResult (TastyTimeout t tstr)
+      let timeoutResult = mkTimeoutResult (TastyTimeout t tstr) :: Result
       -- If compiled with unbounded-delays then t' :: Integer, otherwise t' :: Int
       let t' = fromInteger (min (max 0 t) (toInteger (maxBound :: Int64)))
-      fromMaybe timeoutResult <$> timeout t' a
+      -- But this timeout *is* from System.Timeout;
+      --    it's Int -> IO a -> IO (Maybe a)
+      -- if a times out, timeout t' a  yields Nothing
+      -- then fromMaybe throws `TastyTimeout` instead
+      -- and this can be handled above
+      fromMaybe timeoutResult <$> (timeout t' a :: IO (Maybe Result))
+        :: IO Result
 
     -- destroyResources should not be interrupted by an exception
     -- Here's how we ensure this:

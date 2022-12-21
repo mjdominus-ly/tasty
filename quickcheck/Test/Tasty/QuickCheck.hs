@@ -22,14 +22,14 @@ module Test.Tasty.QuickCheck
 
 import Test.Tasty ( testGroup )
 import Test.Tasty.Providers
-import Test.Tasty.Runners ( resultDescription, mkTimeoutResult )
+import Test.Tasty.Runners ( resultDescription, resultOutcome, mkTimeoutResult, TastyTimeout )
 import Test.Tasty.Options
 import qualified Test.QuickCheck as QC
 import Test.Tasty.Runners (formatMessage)
 import Test.QuickCheck hiding -- for re-export
   ( quickCheck
   , Args(..)
-  , Result
+  , Result(..)
   , stdArgs
   , quickCheckWith
   , quickCheckWithResult
@@ -50,11 +50,13 @@ import Test.QuickCheck hiding -- for re-export
 
 import Data.Typeable
 import Data.List
+import Debug.Trace
 import Text.Printf
 import Test.QuickCheck.Random (mkQCGen)
 import Options.Applicative (metavar)
 import System.Random (getStdRandom, randomR)
-import Control.Exception (handle)
+import System.IO.Unsafe (unsafePerformIO)
+import Control.Exception (handle, SomeException)
 #if !MIN_VERSION_base(4,9,0)
 import Control.Applicative
 import Data.Monoid
@@ -201,6 +203,7 @@ instance IsTest QC where
     , Option (Proxy :: Proxy QuickCheckMaxShrinks)
     ]
 
+  -- run :: OptionSet -> t -> (Progress -> IO ()) -> IO Result
   run opts (QC prop) _yieldProgress = do
     (replaySeed, args) <- optionSetToArgs opts
 
@@ -215,25 +218,41 @@ instance IsTest QC where
 
     -- Quickcheck already catches exceptions, no need to do it here.
     handle (pure . mkTimeoutResultWithSeed replaySeed) $ do
-      r <- testRunner args prop
+      r <- testRunner args prop    -- :: QC.Result
 
       qcOutput <- formatMessage $ QC.output r
       let qcOutputNl =
-            if "\n" `isSuffixOf` qcOutput
-              then qcOutput
-              else qcOutput ++ "\n"
+              if "\n" `isSuffixOf` qcOutput
+                then qcOutput
+                else qcOutput ++ "\n"
           testSuccessful = successful r
           putReplayInDesc = (not testSuccessful) || showReplay
+      putStrLn $ "### " ++ (show r) 
       return $
-        (if testSuccessful then testPassed else testFailed)
-        (qcOutputNl ++
-          (if putReplayInDesc then replayMsg else ""))
-    where
-      -- N.B. technically violates the rule to always rethrow async exceptions,
-      -- but i think this exception to the rule makes sense
-      mkTimeoutResultWithSeed seed e =
-        let result = mkTimeoutResult e
-         in  result{resultDescription = resultDescription result ++ printf " -- with seed: %d" seed}
+          (if testSuccessful then testPassed else testFailed)
+          (qcOutputNl ++
+            (if putReplayInDesc then replayMsg else ""))
+
+tracePV :: Show b => String -> b -> b
+tracePV prefix v = trace (prefix ++ show v) v
+
+-- N.B. technically violates the rule to always rethrow async exceptions,
+-- but i think this exception to the rule makes sense
+mkTimeoutResultWithSeed :: Int -> SomeException -> Result
+mkTimeoutResultWithSeed seed exc =
+  let s = "mkTimeoutResultWithSeed : seed=" ++ (show seed) ++ " exc=" ++ (show exc)
+  in seq (unsafePerformIO $ putStrLn s) (testFailed s)
+ {- let res = mkTimeoutResult exc
+      seedMsg = printf " -- with seed: %d" seed
+      
+  in tracePV
+ "In handler; res = "
+        res{resultDescription = resultDescription res ++ seedMsg} -}
+
+
+--        putStrLn $ "*** " ++ resultDescription result
+--        putStrLn $ "*** " ++ seedMsg
+  
 
 successful :: QC.Result -> Bool
 successful r =

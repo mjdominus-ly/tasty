@@ -50,6 +50,7 @@ module Test.Tasty.Runners
   , module Test.Tasty.Runners.Utils
     -- * also this
   , mkTimeoutResult
+  , TastyTimeout
   )
   where
 
