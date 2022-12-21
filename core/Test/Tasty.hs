@@ -98,7 +98,9 @@ defaultIngredients = [listingTests, consoleTestReporter]
 -- >    throwIO e)
 
 defaultMain :: TestTree -> IO ()
-defaultMain = defaultMainWithIngredients defaultIngredients
+defaultMain = do
+  putStrLn "*** I LIKE PIE ***"
+  defaultMainWithIngredients defaultIngredients
 
 -- | Locally adjust the option value for the given test subtree
 adjustOption :: IsOption v => (v -> v) -> TestTree -> TestTree
