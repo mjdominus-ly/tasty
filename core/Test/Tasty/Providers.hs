@@ -26,7 +26,7 @@ testPassed
 testPassed desc = Result
   { resultOutcome = Success
   , resultDescription = desc
-  , resultShortDescription = "OK"
+  , resultShortDescription = "OH YEAH"
   , resultTime = 0
   , resultDetailsPrinter = noResultDetails
   }
