@@ -130,7 +130,7 @@ executeTest action statusVar timeoutOpt inits fins = mask $ \restore -> do
     -- handler doesn't interfere with our timeout.
     withAsync (action yieldProgress) $ \asy -> do
       labelThread (asyncThreadId asy) "tasty_test_execution_thread"
-      timed $ applyTimeout timeoutOpt $ do
+      timed $ applyTimeout asy timeoutOpt $ do
         r <- wait asy
         -- Not only wait for the result to be returned, but make sure to
         -- evalute it inside applyTimeout; see #280.
@@ -138,7 +138,7 @@ executeTest action statusVar timeoutOpt inits fins = mask $ \restore -> do
           resultOutcome r `seq`
           forceElements (resultDescription r) `seq`
           forceElements (resultShortDescription r)
-        return r
+        return r 
 
   -- no matter what, try to run each finalizer
   mbExn <- destroyResources restore
@@ -180,9 +180,9 @@ executeTest action statusVar timeoutOpt inits fins = mask $ \restore -> do
             BeingDestroyed -> return $ sleepIndefinitely
 
     -- This is Timeout from Test.Tasty.Options.Core, not System.Timeout
-    applyTimeout :: Timeout -> IO Result -> IO Result
-    applyTimeout NoTimeout a = a
-    applyTimeout (Timeout t tstr) a = do
+    applyTimeout :: Timeout -> Async Result -> IO Result -> IO Result
+    applyTimeout NoTimeout _ a = a
+    applyTimeout (Timeout t tstr) testThread a = do
       let timeoutResult = mkTimeoutResult (TastyTimeout t tstr) :: Result
       -- If compiled with unbounded-delays then t' :: Integer, otherwise t' :: Int
       let t' = fromInteger (min (max 0 t) (toInteger (maxBound :: Int64)))
@@ -191,8 +191,11 @@ executeTest action statusVar timeoutOpt inits fins = mask $ \restore -> do
       -- if a times out, timeout t' a  yields Nothing
       -- then fromMaybe throws `TastyTimeout` instead
       -- and this can be handled above
-      fromMaybe timeoutResult <$> (timeout t' a :: IO (Maybe Result))
-        :: IO Result
+      res <- timeout t' a :: IO (Maybe Result) 
+      case res of Nothing -> do 
+                               throwTo asy (TastyTimeout t tstr)
+                               pure timeoutResult  
+                  Just res -> pure res
 
     -- destroyResources should not be interrupted by an exception
     -- Here's how we ensure this:

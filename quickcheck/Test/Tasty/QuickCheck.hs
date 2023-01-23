@@ -1,5 +1,6 @@
 -- | This module allows to use QuickCheck properties in tasty.
 {-# LANGUAGE GeneralizedNewtypeDeriving, DeriveDataTypeable #-}
+{-# LANGUAGE InstanceSigs #-}
 module Test.Tasty.QuickCheck
   ( testProperty
   , testProperties
@@ -55,7 +56,7 @@ import Text.Printf
 import Test.QuickCheck.Random (mkQCGen)
 import Options.Applicative (metavar)
 import System.Random (getStdRandom, randomR)
-import System.IO.Unsafe (unsafePerformIO)
+-- import System.IO.Unsafe (unsafePerformIO)
 import Control.Exception (handle, SomeException)
 #if !MIN_VERSION_base(4,9,0)
 import Control.Applicative
@@ -119,6 +120,7 @@ instance IsOption QuickCheckTests where
 instance IsOption QuickCheckReplay where
   defaultValue = QuickCheckReplay Nothing
   -- Reads a replay int seed
+  parseValue :: String -> Maybe QuickCheckReplay
   parseValue v = QuickCheckReplay . Just <$> safeRead v
   optionName = return "quickcheck-replay"
   optionHelp = return "Random seed to use for replaying a previous test run (use same --quickcheck-max-size)"
@@ -218,7 +220,9 @@ instance IsTest QC where
 
     -- Quickcheck already catches exceptions, no need to do it here.
     handle (pure . mkTimeoutResultWithSeed replaySeed) $ do
+      traceM "A"
       r <- testRunner args prop    -- :: QC.Result
+      traceM "B"
 
       qcOutput <- formatMessage $ QC.output r
       let qcOutputNl =
@@ -227,7 +231,8 @@ instance IsTest QC where
                 else qcOutput ++ "\n"
           testSuccessful = successful r
           putReplayInDesc = (not testSuccessful) || showReplay
-      putStrLn $ "### " ++ (show r) 
+      traceM "C"
+--      putStrLn $ "### " ++ (show r) 
       return $
           (if testSuccessful then testPassed else testFailed)
           (qcOutputNl ++
@@ -241,11 +246,11 @@ tracePV prefix v = trace (prefix ++ show v) v
 mkTimeoutResultWithSeed :: Int -> SomeException -> Result
 mkTimeoutResultWithSeed seed exc =
   let s = "mkTimeoutResultWithSeed : seed=" ++ (show seed) ++ " exc=" ++ (show exc)
-  in seq (unsafePerformIO $ putStrLn s) (testFailed s)
- {- let res = mkTimeoutResult exc
-      seedMsg = printf " -- with seed: %d" seed
-      
-  in tracePV
+  in trace s (testFailed s)
+--  let res = mkTimeoutResult exc
+--     seedMsg = printf " -- with seed: %d" seed
+{-
+  -- in tracePV
  "In handler; res = "
         res{resultDescription = resultDescription res ++ seedMsg} -}
 
